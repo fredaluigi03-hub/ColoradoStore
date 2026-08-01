@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Instagram, Facebook, MessageCircle, ArrowRight } from 'lucide-react';
+import { Instagram, Facebook, MessageCircle } from 'lucide-react';
 
 export default function Footer() {
   const [email, setEmail] = useState('');

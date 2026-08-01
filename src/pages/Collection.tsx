@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { SlidersHorizontal, X, ChevronDown, LayoutGrid, Grid2x2, Grid3x3 } from 'lucide-react';
 import { getProducts, getCollection } from '@/lib/shop';
+import { editorialImages } from '@/lib/shop/mock-data';
 import type { Product, CollectionFilter } from '@/lib/shop/types';
 import ProductCard from '@/components/ProductCard';
 
@@ -28,6 +29,7 @@ export default function CollectionPage() {
   const [columns, setColumns] = useState(4);
   const [showFilters, setShowFilters] = useState(false);
   const [visibleCount, setVisibleCount] = useState(8);
+  const showStyleChoice = handle === 'uomo' || handle === 'donna' || handle === 'sneaker';
 
   useEffect(() => {
     getProducts().then(setAllProducts);
@@ -105,6 +107,14 @@ export default function CollectionPage() {
         </h1>
         {collectionDesc && <p className="text-carta/60 mt-4 max-w-xl text-sm">{collectionDesc}</p>}
       </div>
+
+      {showStyleChoice && (
+        <section className="mx-auto max-w-[1600px] px-4 md:px-8 pb-10 md:pb-14">
+          <div className="border-t border-carta/10 pt-8 md:pt-10"><div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-6"><div><span className="label text-sabbia">Due anime</span><h2 className="display-text text-3xl md:text-5xl mt-1">Quale stile scegli <em className="text-sabbia">oggi?</em></h2></div><button onClick={() => setFilter((current) => ({ ...current, linea: 'all' }))} className="label text-carta/60 hover:text-carta">Mostra tutto il reparto</button></div>
+            <div className="grid md:grid-cols-2 gap-4"><button type="button" onClick={() => setFilter((current) => ({ ...current, linea: 'streetwear' }))} className={`relative min-h-[250px] overflow-hidden text-left group border ${filter.linea === 'streetwear' ? 'border-sabbia' : 'border-carta/10'}`}><img src={editorialImages.streetwear} alt="Streetwear" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" /><div className="absolute inset-0 bg-gradient-to-t from-inchiostro/90 via-inchiostro/15 to-inchiostro/20" /><div className="absolute bottom-0 p-6"><span className="label text-carta/60">Energia urbana</span><span className="block display-text text-carta text-4xl mt-1"><em>Streetwear</em></span></div></button><button type="button" onClick={() => setFilter((current) => ({ ...current, linea: 'old-money' }))} className={`relative min-h-[250px] overflow-hidden text-left group border ${filter.linea === 'old-money' ? 'border-sabbia' : 'border-carta/10'}`}><img src={editorialImages.oldMoney} alt="Old Money" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" /><div className="absolute inset-0 bg-gradient-to-t from-carta/90 via-carta/10 to-carta/20" /><div className="absolute bottom-0 p-6 text-inchiostro"><span className="label opacity-60">Eleganza senza tempo</span><span className="block display-text text-4xl mt-1"><em>Old Money</em></span></div></button></div>
+          </div>
+        </section>
+      )}
 
       {/* Toolbar */}
       <div className="sticky top-16 md:top-20 z-30 bg-inchiostro/90 backdrop-blur-md border-y border-carta/10">

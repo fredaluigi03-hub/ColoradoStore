@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Check, Truck, RotateCcw, Ruler, ZoomIn, Star, ArrowRight } from 'lucide-react';
+import { ChevronDown, Check, Truck, Ruler, ZoomIn, Star } from 'lucide-react';
 import { getProductByHandle, getRelatedProducts } from '@/lib/shop';
 import type { Product, ProductVariant } from '@/lib/shop/types';
 import { useCart } from '@/context/CartContext';

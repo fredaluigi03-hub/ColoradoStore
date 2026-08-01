@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { ArrowRight, Plus, RotateCw, MessageCircle, Star } from 'lucide-react';
 import { useLenis, useInView, useCountUp, useMouseParallax, use360Spin } from '@/lib/hooks';
-import { products, collections, editorialImages, instagramImages, spinFrames } from '@/lib/shop/mock-data';
+import { products, collections, editorialImages, instagramImages, spinFrames, SOCIAL } from '@/lib/shop/mock-data';
 import ProductCard from '@/components/ProductCard';
 
 const HERO_STREETWEAR = 'https://images.pexels.com/photos/30510956/pexels-photo-30510956.jpeg?auto=compress&cs=tinysrgb&w=1200';
@@ -23,8 +23,8 @@ export default function Home() {
       {/* 03 — BANDA LEVI'S (subito dopo il ticker: è il differenziante del negozio) */}
       <LevisBand />
 
+
       {/* 04 — NUOVI ARRIVI */}
-      <NewArrivalsCascade />
 
       {/* La vecchia sezione "Due anime" è stata rimossa: ripeteva la hero.
           La scelta fra Streetwear e Old Money ora sta nelle pagine di reparto
@@ -168,31 +168,28 @@ function HeroSection() {
         ))}
       </div>
 
-      {/* TOP CENTER — Levi's badge */}
+      {/* Claim e badge: in alto, senza coprire le etichette delle due linee. */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5, duration: 0.4 }}
-        className="absolute top-20 md:top-24 left-1/2 -translate-x-1/2 z-20"
+        className="absolute top-24 md:top-28 left-1/2 -translate-x-1/2 z-20 w-full px-4 text-center pointer-events-none"
+      >
+        <p className="display-text text-carta text-2xl md:text-4xl drop-shadow-[0_2px_12px_rgba(11,11,13,0.85)]">
+          Due anime, <em className="text-sabbia">un solo negozio</em>.
+        </p>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6, duration: 0.4 }}
+        className="absolute top-40 md:top-44 left-1/2 -translate-x-1/2 z-20"
       >
         <span className="label text-carta inline-flex items-center gap-2 bg-inchiostro/70 backdrop-blur-md border border-sabbia/30 px-4 py-2 whitespace-nowrap">
           <Star size={10} fill="currentColor" className="text-sabbia" />
           RIVENDITORE UFFICIALE LEVI'S · AVELLINO
         </span>
-      </motion.div>
-
-      {/* TOP CENTER — tagline, sotto il badge Levi's.
-          Stava in basso a sinistra, dove copriva l'etichetta "La linea /
-          Streetwear" che ha esattamente la stessa posizione. */}
-      <motion.div
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6, duration: 0.4 }}
-        className="absolute top-32 md:top-40 left-1/2 -translate-x-1/2 z-20 w-full px-4 text-center pointer-events-none"
-      >
-        <p className="display-text text-carta text-2xl md:text-4xl drop-shadow-[0_2px_12px_rgba(11,11,13,0.85)]">
-          Due anime, <em className="text-sabbia">un solo negozio</em>.
-        </p>
       </motion.div>
 
       {/* Floating product card — Streetwear side */}
@@ -264,23 +261,6 @@ function Ticker() {
 }
 
 // ── 04 NUOVI ARRIVI ──
-function NewArrivalsCascade() {
-  const cascadeProducts = products.slice(0, 4);
-
-  return (
-    <section className="py-12 md:py-16 bg-inchiostro">
-      <div className="mx-auto max-w-[1600px] px-4 md:px-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-          {cascadeProducts.map((product, i) => (
-            <ProductCard key={product.id} product={product} index={i} />
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ── 04 BANDA LEVI'S ──
 function LevisBand() {
   const { ref, inView } = useInView();
   const stats = [
@@ -397,7 +377,7 @@ function CatalogTabs() {
 // ── 06 VETRINA 360° ──
 function Spin360() {
   const { ref, inView } = useInView();
-  const { frameIndex, isDragging, loaded, onPointerDown, onPointerMove, onPointerUp } = use360Spin(spinFrames, inView);
+  const { frameIndex, loaded, onPointerDown, onPointerMove, onPointerUp } = use360Spin(spinFrames, inView);
   const spinProduct = products.find((p) => p.id === 'p-sneaker-navy')!;
 
   return (
@@ -483,9 +463,9 @@ function Spin360() {
 }
 
 // ── 07 SHOP THE LOOK ──
-function ShopTheLook() {
-  const lookProducts = products.filter((p) => ['p-501-original', 'p-tshirt-white', 'p-sneaker-navy'].includes(p.id));
-  const totalPrice = lookProducts.reduce((sum, p) => sum + parseFloat(p.priceRange.minVariantPrice.amount), 0);
+function OutfitBuilder() {
+  const lookProducts = products.filter((product) => ['p-501-original', 'p-tshirt-white', 'p-sneaker-navy'].includes(product.id));
+  const totalPrice = lookProducts.reduce((sum, product) => sum + parseFloat(product.priceRange.minVariantPrice.amount), 0);
   const [hotspotActive, setHotspotActive] = useState<number | null>(null);
   const parallax = useMouseParallax(0.015);
 
@@ -494,82 +474,29 @@ function ShopTheLook() {
       <div className="mx-auto max-w-[1600px] px-4 md:px-8">
         <div className="text-center mb-12">
           <span className="label text-sabbia">07 · Shop the Look</span>
-          <h2 className="display-text text-carta text-4xl md:text-6xl mt-2">
-            Completa il <em className="text-sabbia">look</em>
-          </h2>
+          <h2 className="display-text text-carta text-4xl md:text-6xl mt-2">Completa il <em className="text-sabbia">look</em></h2>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
-          {/* Lookbook image with hotspots */}
           <div className="relative aspect-[4/5] overflow-hidden" data-cursor="view">
-            <img
-              src={editorialImages.lookbook}
-              alt="Lookbook total look"
-              className="w-full h-full object-cover"
-              style={{ transform: `translate(${parallax.x}px, ${parallax.y}px) scale(1.05)` }}
-            />
-            {lookProducts.map((_, i) => {
-              const positions = [
-                { top: '30%', left: '50%' },
-                { top: '60%', left: '45%' },
-                { top: '85%', left: '55%' },
-              ];
+            <img src={editorialImages.lookbook} alt="Lookbook total look" className="w-full h-full object-cover" style={{ transform: `translate(${parallax.x}px, ${parallax.y}px) scale(1.05)` }} />
+            {lookProducts.map((product, index) => {
+              const positions = [{ top: '30%', left: '50%' }, { top: '60%', left: '45%' }, { top: '85%', left: '55%' }];
               return (
-                <button
-                  key={i}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 group"
-                  style={positions[i]}
-                  onMouseEnter={() => setHotspotActive(i)}
-                  onMouseLeave={() => setHotspotActive(null)}
-                  aria-label={`Prodotto ${i + 1}`}
-                >
-                  <span className="block w-6 h-6 rounded-full bg-carta/80 backdrop-blur-sm border-2 border-carta flex items-center justify-center">
-                    <Plus size={12} className="text-inchiostro" />
-                  </span>
-                  {hotspotActive === i && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="absolute left-8 top-0 bg-inchiostro/90 backdrop-blur-sm px-4 py-2 whitespace-nowrap"
-                    >
-                      <p className="text-xs text-carta">{lookProducts[i].title}</p>
-                      <p className="text-xs text-sabbia">{parseFloat(lookProducts[i].priceRange.minVariantPrice.amount).toFixed(0)}€</p>
-                    </motion.div>
-                  )}
+                <button key={product.id} type="button" className="absolute -translate-x-1/2 -translate-y-1/2 group" style={positions[index]} onMouseEnter={() => setHotspotActive(index)} onMouseLeave={() => setHotspotActive(null)} aria-label={`Vedi ${product.title}`}>
+                  <span className="block w-6 h-6 rounded-full bg-carta/80 backdrop-blur-sm border-2 border-carta flex items-center justify-center"><Plus size={12} className="text-inchiostro" /></span>
+                  {hotspotActive === index && <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="absolute left-8 top-0 bg-inchiostro/90 backdrop-blur-sm px-4 py-2 whitespace-nowrap"><p className="text-xs text-carta">{product.title}</p><p className="text-xs text-sabbia">{parseFloat(product.priceRange.minVariantPrice.amount).toFixed(0)}€</p></motion.div>}
                 </button>
               );
             })}
           </div>
 
-          {/* Product list */}
-          <div>
-            <div className="space-y-4 mb-8">
-              {lookProducts.map((product, i) => (
-                <Link
-                  key={product.id}
-                  to={`/prodotti/${product.handle}`}
-                  className="flex items-center gap-4 group"
-                >
-                  <span className="label text-sabbia w-6">{String(i + 1).padStart(2, '0')}</span>
-                  <img src={product.featuredImage.url} alt={product.featuredImage.altText} width={60} height={80} className="w-16 h-20 object-cover" />
-                  <div className="flex-1">
-                    <p className="text-sm text-carta group-hover:text-sabbia transition-colors">{product.title}</p>
-                    <p className="text-xs text-carta/50">{product.vendor}</p>
-                  </div>
-                  <span className="text-sm text-carta">{parseFloat(product.priceRange.minVariantPrice.amount).toFixed(0)}€</span>
-                </Link>
-              ))}
+          <div className="bg-inchiostro-400 border border-carta/10 p-4 md:p-6">
+            <span className="label text-sabbia">Il look selezionato</span>
+            <div className="mt-4 space-y-3">
+              {lookProducts.map((product, index) => <Link key={product.id} to={`/prodotti/${product.handle}`} className="relative block min-h-[140px] overflow-hidden border border-carta/10 bg-inchiostro group hover:border-sabbia/60 transition-colors"><img src={product.featuredImage.url} alt={product.featuredImage.altText} className="absolute inset-y-0 right-0 w-[48%] h-full object-cover transition-transform duration-500 group-hover:scale-105" /><div className="absolute inset-y-0 right-[42%] w-24 bg-gradient-to-r from-inchiostro via-inchiostro/90 to-transparent" /><div className="relative z-10 w-[62%] h-full min-h-[140px] p-5 flex flex-col justify-between"><span className="label text-sabbia">0{index + 1}</span><div><p className="display-text text-2xl md:text-3xl text-carta leading-none">{product.title}</p><p className="text-xs text-carta/50 mt-2">{product.vendor}</p><p className="text-sm text-sabbia mt-3">{parseFloat(product.priceRange.minVariantPrice.amount).toFixed(0)}€ <span className="text-carta/50 group-hover:text-carta transition-colors">· Vedi capo</span></p></div></div></Link>)}
             </div>
-
-            <div className="border-t border-carta/10 pt-6">
-              <div className="flex justify-between items-center mb-4">
-                <span className="label text-carta/60">Totale look</span>
-                <span className="display-text text-3xl text-carta">{totalPrice.toFixed(0)}€</span>
-              </div>
-              <button className="w-full py-4 bg-carta text-inchiostro label hover:bg-sabbia transition-colors">
-                Aggiungi tutto al carrello
-              </button>
-            </div>
+            <div className="border-t border-carta/10 pt-5 mt-5 flex justify-between items-end"><span className="label text-carta/60">Totale look</span><span className="display-text text-4xl text-carta">{totalPrice.toFixed(0)}€</span></div>
           </div>
         </div>
       </div>
@@ -677,14 +604,14 @@ function InstagramGrid() {
         <div className="text-center mb-12">
           <span className="label text-sabbia">10 · Instagram</span>
           <h2 className="display-text text-carta text-4xl md:text-6xl mt-2">
-            <em>@coloradostore</em>
+            <em>{SOCIAL.instagramHandle}</em>
           </h2>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-4">
           {instagramImages.map((img, i) => (
             <motion.a
               key={i}
-              href="https://instagram.com"
+              href={SOCIAL.instagram}
               target="_blank"
               rel="noreferrer"
               initial={{ opacity: 0, scale: 0.9 }}

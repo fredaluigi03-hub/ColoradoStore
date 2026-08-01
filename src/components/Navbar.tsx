@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ShoppingBag, Menu, X, ChevronDown } from 'lucide-react';
+import { Search, ShoppingBag, Menu, X } from 'lucide-react';
 import { useScrollDirection } from '@/lib/hooks';
 import { useCart } from '@/context/CartContext';
 import { collections, editorialImages } from '@/lib/shop/mock-data';
