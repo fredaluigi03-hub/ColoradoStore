@@ -103,9 +103,10 @@
     scrollbar-width: none;
   }
 
-  .grain {
-    position: relative;
-  }
+  /* Niente `position: relative` qui: `.grain` sta nello stesso layer di
+     Tailwind e, venendo dopo, sovrascriveva il `fixed` del preloader
+     buttandolo nel flusso e spostando la pagina di 72px. Chi usa .grain deve
+     già essere posizionato (relative/fixed/absolute). */
   .grain::after {
     content: '';
     position: absolute;

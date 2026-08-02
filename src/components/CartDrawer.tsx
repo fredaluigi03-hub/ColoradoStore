@@ -1,13 +1,16 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Minus, Trash2, ArrowRight, Truck } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
-import { products } from '@/lib/shop/mock-data';
+import { getProductsByCollection } from '@/lib/shop';
+import { SHIPPING, formatPrice } from '@/lib/shop/site';
+import type { Product } from '@/lib/shop/types';
 
 export default function CartDrawer() {
   const { cart, isOpen, closeCart, updateQuantity, removeLine, remainingForFreeShipping } = useCart();
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [pool, setPool] = useState<Product[]>([]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -16,12 +19,17 @@ export default function CartDrawer() {
     if (!isOpen && dialog.open) dialog.close();
   }, [isOpen]);
 
-  // Prodotti suggeriti (non nel carrello)
+  // I suggeriti servono solo a carrello aperto: niente fetch prima.
+  useEffect(() => {
+    if (!isOpen || pool.length) return;
+    getProductsByCollection('best-sellers').then((list) => setPool(list.filter((p) => p.availableForSale)));
+  }, [isOpen, pool.length]);
+
   const cartProductIds = new Set(cart.lines.map((l) => l.productId));
-  const suggestions = products.filter((p) => !cartProductIds.has(p.id)).slice(0, 3);
+  const suggestions = pool.filter((p) => !cartProductIds.has(p.id)).slice(0, 3);
 
   const subtotal = parseFloat(cart.cost.subtotalAmount.amount);
-  const progress = Math.min(100, ((remainingForFreeShipping === 0 ? subtotal : subtotal) / (subtotal + remainingForFreeShipping)) * 100);
+  const progress = Math.min(100, (subtotal / (subtotal + remainingForFreeShipping)) * 100);
 
   return (
     <dialog
@@ -55,7 +63,7 @@ export default function CartDrawer() {
                   <Truck size={16} className="text-sabbia" />
                   <p className="text-sm text-carta/70">
                     {remainingForFreeShipping > 0 ? (
-                      <>Ti mancano <strong className="text-carta">{remainingForFreeShipping.toFixed(2)}€</strong> alla spedizione gratuita</>
+                      <>Ti mancano <strong className="text-carta">{formatPrice(remainingForFreeShipping)}</strong> alla spedizione gratuita</>
                     ) : (
                       <span className="text-sabbia">Spedizione gratuita raggiunta</span>
                     )}
@@ -123,7 +131,7 @@ export default function CartDrawer() {
                             </button>
                           </div>
                           <div className="flex items-center gap-3">
-                            <span className="text-sm font-medium">{(parseFloat(line.price.amount) * line.quantity).toFixed(2)}€</span>
+                            <span className="text-sm font-medium">{formatPrice(parseFloat(line.price.amount) * line.quantity)}</span>
                             <button
                               onClick={() => removeLine(line.id)}
                               className="text-carta/40 hover:text-rame transition-colors"
@@ -138,7 +146,7 @@ export default function CartDrawer() {
                   ))}
 
                   {/* Suggestions */}
-                  <div className="px-6 py-4">
+                  <div className={`px-6 py-4 ${suggestions.length ? '' : 'hidden'}`}>
                     <p className="label text-sabbia mb-3">Potrebbe interessarti</p>
                     <div className="flex gap-3 overflow-x-auto no-scrollbar">
                       {suggestions.map((p) => (
@@ -163,19 +171,23 @@ export default function CartDrawer() {
               <div className="border-t border-carta/10 px-6 py-5 space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-carta/60 text-sm">Subtotale</span>
-                  <span className="display-text text-2xl">{subtotal.toFixed(2)}€</span>
+                  <span className="display-text text-2xl">{formatPrice(subtotal)}</span>
                 </div>
-                <Link
-                  to="/checkout"
-                  onClick={closeCart}
+                {/* Checkout reale: il permalink porta al carrello Shopify del
+                    negozio, dove avviene il pagamento. */}
+                <a
+                  href={cart.checkoutUrl}
                   className="flex items-center justify-center gap-2 w-full py-4 bg-carta text-inchiostro label hover:bg-sabbia transition-colors"
                 >
                   Vai al checkout
                   <ArrowRight size={16} />
-                </Link>
+                </a>
+                <p className="text-[10px] text-carta/40 text-center">
+                  Pagamento sicuro su Shopify
+                </p>
                 <div className="flex items-center gap-2 text-xs text-sabbia">
                   <Truck size={14} />
-                  <span>Ritira in negozio ad Avellino — gratis, pronto in 24h</span>
+                  <span>Spedizione gratuita da {SHIPPING.freeThreshold}€ · Consegna in {SHIPPING.deliveryTime}</span>
                 </div>
                 <button
                   onClick={closeCart}

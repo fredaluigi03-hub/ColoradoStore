@@ -58,11 +58,14 @@ export function useInView<T extends HTMLElement = HTMLDivElement>(options?: Inte
 // Numeri che si incrementano quando entrano in vista
 export function useCountUp(target: number, duration = 2000, start = false) {
   const [count, setCount] = useState(0);
-  const startedRef = useRef(false);
+  // Memorizziamo il target già animato invece di un semplice "fatto": i numeri
+  // arrivano dal catalogo in modo asincrono e possono cambiare dopo il primo
+  // ingresso in viewport, che altrimenti congelerebbe il conteggio a zero.
+  const animatedFor = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!start || startedRef.current) return;
-    startedRef.current = true;
+    if (!start || animatedFor.current === target) return;
+    animatedFor.current = target;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       setCount(target);
       return;

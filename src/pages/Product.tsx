@@ -1,8 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Check, Truck, Ruler, ZoomIn, Star } from 'lucide-react';
+import { ChevronDown, Check, Truck, ZoomIn } from 'lucide-react';
 import { getProductByHandle, getRelatedProducts } from '@/lib/shop';
+import { SHIPPING, STORE, formatPrice } from '@/lib/shop/site';
+import { usePageMeta, useJsonLd } from '@/lib/meta';
 import type { Product, ProductVariant } from '@/lib/shop/types';
 import { useCart } from '@/context/CartContext';
 import ProductCard from '@/components/ProductCard';
@@ -10,44 +12,99 @@ import ProductCard from '@/components/ProductCard';
 export default function ProductPage() {
   const { handle } = useParams();
   const [product, setProduct] = useState<Product | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const [related, setRelated] = useState<Product[]>([]);
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [openAccordion, setOpenAccordion] = useState<string | null>('descrizione');
   const [zoomOpen, setZoomOpen] = useState(false);
   const [zoomPos, setZoomPos] = useState({ x: 50, y: 50 });
   const imgRef = useRef<HTMLDivElement>(null);
   const { addToCart } = useCart();
 
+  const sizes = product?.options.find((o) => o.name === 'Taglia')?.values ?? [];
+  const colors = product?.options.find((o) => o.name === 'Colore')?.values ?? [];
+
   useEffect(() => {
     if (!handle) return;
+    let alive = true;
+    setProduct(null);
+    setNotFound(false);
+    setSelectedImage(0);
     getProductByHandle(handle).then((p) => {
-      setProduct(p || null);
-      if (p) {
-        setSelectedColor(p.options.find((o) => o.name === 'Colore')?.values[0] || '');
-        setSelectedSize(p.options.find((o) => o.name === 'Taglia')?.values[0] || '');
-        getRelatedProducts(p).then(setRelated);
+      if (!alive) return;
+      if (!p) {
+        setNotFound(true);
+        return;
       }
+      setProduct(p);
+      // Preseleziona la prima combinazione davvero acquistabile.
+      const first = p.variants.find((v) => v.availableForSale) || p.variants[0];
+      setSelectedColor(first?.selectedOptions.find((o) => o.name === 'Colore')?.value || '');
+      setSelectedSize(first?.selectedOptions.find((o) => o.name === 'Taglia')?.value || '');
+      getRelatedProducts(p).then((r) => alive && setRelated(r));
     });
+    return () => {
+      alive = false;
+    };
   }, [handle]);
 
-  // Find selected variant
-  useEffect(() => {
-    if (!product || !selectedSize || !selectedColor) return;
-    const variant = product.variants.find(
-      (v) =>
-        v.selectedOptions.some((o) => o.name === 'Taglia' && o.value === selectedSize) &&
-        v.selectedOptions.some((o) => o.name === 'Colore' && o.value === selectedColor),
+  // Molti prodotti reali hanno un solo asse (solo taglia) o nessuno: la ricerca
+  // deve reggere tutti e tre i casi, non solo taglia+colore.
+  const selectedVariant: ProductVariant | null = useMemo(() => {
+    if (!product) return null;
+    if (product.variants.length === 1) return product.variants[0];
+    return (
+      product.variants.find(
+        (v) =>
+          (!sizes.length || v.selectedOptions.some((o) => o.name === 'Taglia' && o.value === selectedSize)) &&
+          (!colors.length || v.selectedOptions.some((o) => o.name === 'Colore' && o.value === selectedColor)),
+      ) || null
     );
-    setSelectedVariant(variant || null);
-  }, [product, selectedSize, selectedColor]);
+  }, [product, selectedSize, selectedColor, sizes.length, colors.length]);
 
   const currentPrice = selectedVariant?.price || product?.priceRange.minVariantPrice || { amount: '0', currencyCode: 'EUR' };
   const currentCompare = selectedVariant?.compareAtPrice || product?.compareAtPriceRange?.minVariantCompareAtPrice;
-  const isAvailable = selectedVariant?.availableForSale ?? product?.availableForSale ?? false;
-  const stockQty = selectedVariant?.quantityAvailable ?? 0;
+  const isAvailable = selectedVariant ? selectedVariant.availableForSale : (product?.availableForSale ?? false);
+
+  usePageMeta({
+    // Molti capi hanno "Colorado Store" come vendor: evitiamo il titolo doppio.
+    title: product
+      ? [product.title, product.vendor === STORE.name ? null : product.vendor, STORE.name]
+          .filter(Boolean)
+          .join(' · ')
+      : 'Prodotto · Colorado Store',
+    description: product
+      ? `${product.description.slice(0, 155) || `${product.title} di ${product.vendor}.`}`
+      : 'Dettaglio prodotto.',
+    image: product?.featuredImage.url,
+  });
+
+  const structuredData = useMemo(
+    () =>
+      product
+        ? {
+            '@context': 'https://schema.org',
+            '@type': 'Product',
+            name: product.title,
+            description: product.description,
+            image: product.images.map((i) => i.url),
+            brand: { '@type': 'Brand', name: product.vendor },
+            offers: {
+              '@type': 'Offer',
+              url: window.location.href,
+              price: parseFloat(currentPrice.amount).toFixed(2),
+              priceCurrency: 'EUR',
+              itemCondition: 'https://schema.org/NewCondition',
+              availability: isAvailable ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+              seller: { '@type': 'Organization', name: STORE.name },
+            },
+          }
+        : null,
+    [product, currentPrice.amount, isAvailable],
+  );
+  useJsonLd(structuredData, 'ld-product');
 
   const handleZoomMove = (e: React.MouseEvent) => {
     if (!imgRef.current) return;
@@ -58,6 +115,19 @@ export default function ProductPage() {
     });
   };
 
+  if (notFound) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-inchiostro px-4">
+        <div className="text-center">
+          <p className="display-text text-4xl text-carta/60 mb-4">Prodotto non disponibile</p>
+          <Link to="/collezioni/new-collection" className="label text-sabbia hover:text-carta transition-colors">
+            Vedi i nuovi arrivi
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (!product) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-inchiostro">
@@ -66,29 +136,14 @@ export default function ProductPage() {
     );
   }
 
-  const structuredData = {
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    name: product.title,
-    description: product.description,
-    brand: { '@type': 'Brand', name: product.vendor },
-    offers: {
-      '@type': 'Offer',
-      price: parseFloat(currentPrice.amount).toFixed(2),
-      priceCurrency: 'EUR',
-      availability: isAvailable ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-    },
-  };
-
   return (
     <div className="bg-inchiostro text-carta min-h-screen pt-16 md:pt-20">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
       <div className="mx-auto max-w-[1600px] px-4 md:px-8 py-8">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-xs text-carta/40 mb-8">
           <Link to="/" className="hover:text-carta transition-colors">Home</Link>
           <span>/</span>
-          <Link to={`/collezioni/${product.tagsLine[0]}`} className="hover:text-carta transition-colors capitalize">
+          <Link to={`/collezioni/${product.tagsLine[0]}`} className="hover:text-carta transition-colors">
             {product.tagsLine[0] === 'old-money' ? 'Old Money' : 'Streetwear'}
           </Link>
           <span>/</span>
@@ -138,57 +193,52 @@ export default function ProductPage() {
             <p className="label text-sabbia">{product.vendor}</p>
             <h1 className="display-text text-carta text-4xl md:text-5xl mt-2">{product.title}</h1>
 
-            {/* Rating */}
-            {product.rating && (
-              <div className="flex items-center gap-2 mt-3">
-                <div className="flex">
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <Star key={s} size={14} className={s <= Math.round(product.rating!) ? 'text-sabbia fill-current' : 'text-carta/20'} />
-                  ))}
-                </div>
-                <span className="text-xs text-carta/50">{product.rating} · {product.reviewCount} recensioni</span>
-              </div>
-            )}
-
             {/* Price */}
             <div className="flex items-center gap-3 mt-6">
-              <span className="display-text text-3xl text-carta">{parseFloat(currentPrice.amount).toFixed(2)}€</span>
+              <span className="display-text text-3xl text-carta">{formatPrice(currentPrice.amount)}</span>
               {currentCompare && (
-                <span className="text-lg text-carta/40 line-through">{parseFloat(currentCompare.amount).toFixed(2)}€</span>
+                <span className="text-lg text-carta/40 line-through">{formatPrice(currentCompare.amount)}</span>
               )}
             </div>
 
             <p className="text-carta/60 text-sm mt-4 leading-relaxed">{product.description}</p>
 
             {/* Color */}
-            <div className="mt-8">
-              <p className="label text-carta/60 mb-2">Colore: <span className="text-carta">{selectedColor}</span></p>
-              <div className="flex gap-2">
-                {product.options.find((o) => o.name === 'Colore')?.values.map((color) => (
-                  <button
-                    key={color}
-                    onClick={() => setSelectedColor(color)}
-                    className={`px-4 py-2 text-sm border transition-colors ${selectedColor === color ? 'border-sabbia text-sabbia' : 'border-carta/20 text-carta/60 hover:border-carta/50'}`}
-                  >
-                    {color}
-                  </button>
-                ))}
+            {colors.length > 0 && (
+              <div className="mt-8">
+                <p className="label text-carta/60 mb-2">Colore: <span className="text-carta">{selectedColor}</span></p>
+                <div className="flex flex-wrap gap-2">
+                  {colors.map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => setSelectedColor(color)}
+                      className={`px-4 py-2 text-sm border transition-colors ${selectedColor === color ? 'border-sabbia text-sabbia' : 'border-carta/20 text-carta/60 hover:border-carta/50'}`}
+                    >
+                      {color}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Size */}
+            {sizes.length > 0 && (
             <div className="mt-6">
               <div className="flex items-center justify-between mb-2">
                 <p className="label text-carta/60">Taglia: <span className="text-carta">{selectedSize}</span></p>
-                <button className="label text-sabbia flex items-center gap-1 hover:text-carta transition-colors">
-                  <Ruler size={12} /> Guida taglie
+                <button
+                  onClick={() => setOpenAccordion('taglie')}
+                  className="label text-sabbia hover:text-carta transition-colors"
+                >
+                  Guida taglie
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
-                {product.options.find((o) => o.name === 'Taglia')?.values.map((size) => {
-                  const sizeVariant = product.variants.find((v) =>
-                    v.selectedOptions.some((o) => o.name === 'Taglia' && o.value === size) &&
-                    v.selectedOptions.some((o) => o.name === 'Colore' && o.value === selectedColor)
+                {sizes.map((size) => {
+                  const sizeVariant = product.variants.find(
+                    (v) =>
+                      v.selectedOptions.some((o) => o.name === 'Taglia' && o.value === size) &&
+                      (!colors.length || v.selectedOptions.some((o) => o.name === 'Colore' && o.value === selectedColor)),
                   );
                   const available = sizeVariant?.availableForSale ?? false;
                   return (
@@ -210,20 +260,14 @@ export default function ProductPage() {
                 })}
               </div>
             </div>
+            )}
 
-            {/* Availability */}
+            {/* Availability — il negozio espone solo il booleano, non le giacenze */}
             <div className="mt-6">
               {isAvailable ? (
-                stockQty <= 4 ? (
-                  <p className="text-sm text-rame flex items-center gap-2">
-                    <span className="w-2 h-2 bg-rame rounded-full animate-pulse" />
-                    Ultimi {stockQty} pezzi
-                  </p>
-                ) : (
-                  <p className="text-sm text-sabbia flex items-center gap-2">
-                    <Check size={14} /> Disponibile
-                  </p>
-                )
+                <p className="text-sm text-sabbia flex items-center gap-2">
+                  <Check size={14} /> Disponibile
+                </p>
               ) : (
                 <p className="text-sm text-carta/40 flex items-center gap-2">
                   <span className="w-2 h-2 bg-carta/40 rounded-full" />
@@ -241,48 +285,52 @@ export default function ProductPage() {
               {isAvailable ? 'Aggiungi al carrello' : 'Esaurito'}
             </button>
 
-            {/* Store pickup */}
+            {/* Spedizione e ritiro */}
             <div className="mt-4 flex items-center gap-3 border border-sabbia/20 bg-sabbia/5 px-4 py-3">
               <Truck size={18} className="text-sabbia flex-shrink-0" />
               <div>
-                <p className="text-sm text-carta">Ritira in negozio ad Avellino</p>
-                <p className="text-xs text-carta/50">Gratis, pronto in 24 ore</p>
+                <p className="text-sm text-carta">Spedizione gratuita da {SHIPPING.freeThreshold}€</p>
+                <p className="text-xs text-carta/50">Consegna in {SHIPPING.deliveryTime} · oppure ritiro in negozio ad {STORE.city}</p>
               </div>
             </div>
 
             {/* Accordions */}
             <div className="mt-8 border-t border-carta/10">
               <Accordion id="descrizione" title="Descrizione" open={openAccordion} setOpen={setOpenAccordion}>
-                <p className="text-sm text-carta/60 leading-relaxed">{product.description}</p>
-                <p className="text-sm text-carta/60 leading-relaxed mt-2">
-                  Composizione e cura: segui le istruzioni sull'etichetta. Lavaggio a freddo, asciugatura all'aria.
+                <p className="text-sm text-carta/60 leading-relaxed">
+                  {product.description || `${product.title} di ${product.vendor}.`}
                 </p>
               </Accordion>
               <Accordion id="spedizione" title="Spedizione" open={openAccordion} setOpen={setOpenAccordion}>
                 <p className="text-sm text-carta/60 leading-relaxed">
-                  Spedizione gratuita per ordini sopra 99€. Consegna in 2-4 giorni lavorativi. Tracking disponibile.
+                  Spedizione gratuita per ordini sopra {SHIPPING.freeThreshold}€, altrimenti{' '}
+                  {formatPrice(SHIPPING.standardCost)}. Consegna in {SHIPPING.deliveryTime} con
+                  tracking. Ritiro gratuito in negozio ad {STORE.city}.
                 </p>
               </Accordion>
               <Accordion id="resi" title="Resi e cambi" open={openAccordion} setOpen={setOpenAccordion}>
                 <p className="text-sm text-carta/60 leading-relaxed">
-                  Reso gratuito entro 30 giorni. Cambio taglia gratuito. Il capo deve essere in perfette condizioni con etichette intatte.
+                  Hai {SHIPPING.returnDays} giorni per il reso. Il capo deve essere in perfette condizioni con
+                  etichette intatte. Per il cambio taglia scrivici su WhatsApp.
                 </p>
               </Accordion>
-              <Accordion id="taglie" title="Guida taglie" open={openAccordion} setOpen={setOpenAccordion}>
-                <div className="text-sm text-carta/60 space-y-1">
-                  <p>Taglie disponibili: {product.options.find((o) => o.name === 'Taglia')?.values.join(', ')}</p>
-                  <p>Per dubbi sulla taglia, contattaci su WhatsApp.</p>
-                </div>
-              </Accordion>
+              {sizes.length > 0 && (
+                <Accordion id="taglie" title="Guida taglie" open={openAccordion} setOpen={setOpenAccordion}>
+                  <div className="text-sm text-carta/60 space-y-1">
+                    <p>Taglie disponibili: {sizes.join(', ')}</p>
+                    <p>Per dubbi sulla vestibilità, contattaci su WhatsApp: ti rispondiamo dal negozio.</p>
+                  </div>
+                </Accordion>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Complete the look */}
+        {/* Related */}
         {related.length > 0 && (
           <div className="mt-20 md:mt-28">
             <h2 className="display-text text-carta text-3xl md:text-5xl mb-8">
-              Completa il <em className="text-sabbia">look</em>
+              Ti potrebbe <em className="text-sabbia">piacere</em>
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
               {related.map((p, i) => (

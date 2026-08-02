@@ -1,17 +1,28 @@
-import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { MessageCircle, MapPin, Clock, Mail, Phone, Send } from 'lucide-react';
-import { editorialImages } from '@/lib/shop/mock-data';
+import { MessageCircle, MapPin, ArrowRight } from 'lucide-react';
+import { editorialImages } from '@/lib/shop/editorial';
+import { STORE, SOCIAL } from '@/lib/shop/site';
+import { usePageMeta } from '@/lib/meta';
 
 export default function AboutPage() {
-  const [form, setForm] = useState({ nome: '', email: '', messaggio: '' });
-  const [sent, setSent] = useState(false);
+  usePageMeta({
+    title: "Chi siamo · Colorado Store Avellino · Rivenditore Ufficiale Levi's",
+    description:
+      "Dagli anni Novanta ad Avellino. Unico negozio della zona con licenza ufficiale per la rivendita Levi's. Streetwear e Old Money sotto lo stesso tetto.",
+  });
 
   return (
     <div className="min-h-screen bg-inchiostro text-carta pt-20 md:pt-24">
       {/* Hero */}
       <section className="relative h-[50vh] overflow-hidden">
-        <img src={editorialImages.store} alt="Negozio Colorado Store" width={1600} height={900} className="w-full h-full object-cover" />
+        <img
+          src={editorialImages.levis.url}
+          alt={editorialImages.levis.alt}
+          width={1600}
+          height={900}
+          className="w-full h-full object-cover"
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-inchiostro via-inchiostro/40 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 p-8 md:p-12">
           <span className="label text-sabbia">La nostra storia</span>
@@ -24,37 +35,40 @@ export default function AboutPage() {
       {/* Story */}
       <section className="py-20 md:py-28">
         <div className="mx-auto max-w-3xl px-4 md:px-8">
-          <div className="grid md:grid-cols-2 gap-8 items-center mb-16">
-            <div>
-              <span className="label text-sabbia">Dal 1985</span>
-              <h2 className="display-text text-carta text-3xl md:text-5xl mt-2 mb-4">
-                Ad <em className="text-sabbia">Avellino</em>, nel cuore dell'Irpinia
-              </h2>
-              <p className="text-carta/60 text-sm leading-relaxed">
-                Da oltre quarant'anni vestiamo la nostra città. Quella che iniziata come piccola merceria,
-                oggi è il punto di riferimento per chi cerca qualità e stile. Siamo l'unico rivenditore
-                ufficiale Levi's della zona e portiamo avanti una visione: due mondi sotto lo stesso tetto.
-              </p>
-            </div>
-            <img src={editorialImages.storeInterior} alt="Interno del negozio" width={800} height={320} className="w-full h-80 object-cover" />
+          <span className="label text-sabbia">Dagli anni Novanta</span>
+          <h2 className="display-text text-carta text-3xl md:text-5xl mt-2 mb-6">
+            Ad <em className="text-sabbia">Avellino</em>, nel cuore dell&rsquo;Irpinia
+          </h2>
+          <div className="space-y-4 text-carta/60 text-sm md:text-base leading-relaxed">
+            <p>
+              Il nostro viaggio nel mondo della moda è iniziato agli inizi degli anni Novanta, quando
+              il team di Colorado Store ha deciso di trasformare una passione in una realtà. Fin
+              dall&rsquo;inizio l&rsquo;obiettivo è stato creare un negozio che non offrisse solo abbigliamento,
+              ma uno stile di vita fatto di autenticità, creatività e individualità.
+            </p>
+            <p>
+              Oggi, anche se siamo cresciuti, l&rsquo;impegno resta lo stesso: capi che uniscono comfort e
+              design, scelti uno a uno. E siamo orgogliosi di essere l&rsquo;unico negozio della zona con
+              la licenza ufficiale per la rivendita dei prodotti Levi&rsquo;s&nbsp;&mdash; un&rsquo;icona che
+              rappresenta stile e qualità senza tempo.
+            </p>
           </div>
 
           <div className="border-l-2 border-sabbia pl-6 my-12">
             <p className="display-text text-carta text-2xl md:text-3xl italic leading-relaxed">
-              "Crediamo che il vestire sia un atto di identità. Ogni capo che scegli racconta chi sei,
-              da dove vieni e dove stai andando."
+              Tradizione e innovazione, mescolate in un&rsquo;unica visione: il nostro stile non si ferma
+              mai, online e in negozio.
             </p>
-            <p className="label text-sabbia mt-4">— La titolare</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 mt-16">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-16">
             {[
-              { num: '40+', label: 'Anni di storia' },
-              { num: '2', label: 'Anime: Streetwear & Old Money' },
-              { num: '100%', label: "Autentico, rivenditore Levi's" },
+              { num: '30+', label: 'Anni ad Avellino' },
+              { num: '40+', label: 'Brand a catalogo' },
+              { num: "Levi's", label: 'Rivenditore ufficiale' },
             ].map((stat, i) => (
               <motion.div
-                key={i}
+                key={stat.label}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
@@ -69,114 +83,32 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Contact */}
+      {/* Vieni a trovarci */}
       <section className="py-20 md:py-28 bg-inchiostro-400 border-y border-carta/10">
-        <div className="mx-auto max-w-[1600px] px-4 md:px-8">
-          <div className="text-center mb-12">
-            <span className="label text-sabbia">Contatti</span>
-            <h2 className="display-text text-carta text-4xl md:text-6xl mt-2">
-              Vieni a <em className="text-sabbia">trovarci</em>
-            </h2>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-12">
-            {/* Info */}
-            <div className="space-y-6">
-              <div className="flex items-start gap-4">
-                <MapPin size={20} className="text-sabbia mt-1" />
-                <div>
-                  <h3 className="label-lg text-carta mb-1">Indirizzo</h3>
-                  <p className="text-sm text-carta/60">Corso Vittorio Emanuele, 1<br />83100 Avellino (AV)</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <Clock size={20} className="text-sabbia mt-1" />
-                <div>
-                  <h3 className="label-lg text-carta mb-1">Orari</h3>
-                  <p className="text-sm text-carta/60">
-                    Lunedì — Sabato: 9:30 — 19:30<br />
-                    Domenica: chiuso
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <Phone size={20} className="text-sabbia mt-1" />
-                <div>
-                  <h3 className="label-lg text-carta mb-1">Telefono</h3>
-                  <p className="text-sm text-carta/60">+39 0825 00000</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <Mail size={20} className="text-sabbia mt-1" />
-                <div>
-                  <h3 className="label-lg text-carta mb-1">Email</h3>
-                  <p className="text-sm text-carta/60">info@coloradostore.it</p>
-                </div>
-              </div>
-              <a
-                href="https://wa.me/390000000000"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-sabbia text-inchiostro label hover:bg-carta transition-colors"
-              >
-                <MessageCircle size={16} /> Scrivici su WhatsApp
-              </a>
-            </div>
-
-            {/* Form */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setSent(true);
-              }}
-              className="space-y-4"
+        <div className="mx-auto max-w-3xl px-4 md:px-8 text-center">
+          <span className="label text-sabbia">Il negozio</span>
+          <h2 className="display-text text-carta text-4xl md:text-6xl mt-2 mb-4">
+            Vieni a <em className="text-sabbia">trovarci</em>
+          </h2>
+          <p className="text-carta/60 text-sm inline-flex items-center gap-2 justify-center">
+            <MapPin size={16} className="text-sabbia" />
+            {STORE.address}, {STORE.zip} {STORE.city} ({STORE.province})
+          </p>
+          <div className="flex flex-wrap gap-3 justify-center mt-8">
+            <Link
+              to="/negozio"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-carta text-inchiostro label hover:bg-sabbia transition-colors"
             >
-              <div>
-                <label className="label text-carta/50 block mb-1.5">Nome</label>
-                <input
-                  type="text"
-                  value={form.nome}
-                  onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
-                  className="w-full bg-transparent border border-carta/20 px-4 py-3 text-carta outline-none focus:border-sabbia transition-colors"
-                  required
-                />
-              </div>
-              <div>
-                <label className="label text-carta/50 block mb-1.5">Email</label>
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  className="w-full bg-transparent border border-carta/20 px-4 py-3 text-carta outline-none focus:border-sabbia transition-colors"
-                  required
-                />
-              </div>
-              <div>
-                <label className="label text-carta/50 block mb-1.5">Messaggio</label>
-                <textarea
-                  rows={5}
-                  value={form.messaggio}
-                  onChange={(e) => setForm((f) => ({ ...f, messaggio: e.target.value }))}
-                  className="w-full bg-transparent border border-carta/20 px-4 py-3 text-carta outline-none focus:border-sabbia transition-colors resize-none"
-                  required
-                />
-              </div>
-              <button
-                type="submit"
-                className="flex items-center justify-center gap-2 w-full py-4 bg-carta text-inchiostro label hover:bg-sabbia transition-colors"
-              >
-                {sent ? 'Messaggio inviato' : 'Invia messaggio'} <Send size={14} />
-              </button>
-            </form>
-          </div>
-
-          {/* Map placeholder */}
-          <div className="mt-12 h-64 bg-inchiostro-300 border border-carta/10 flex items-center justify-center">
-            <div className="text-center">
-              <MapPin size={32} className="text-sabbia mx-auto mb-2" />
-              <p className="text-sm text-carta/50">Avellino, Italia</p>
-              <p className="text-xs text-carta/30">Corso Vittorio Emanuele, 1</p>
-            </div>
+              Orari e indicazioni <ArrowRight size={14} />
+            </Link>
+            <a
+              href={SOCIAL.whatsapp}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 border border-sabbia/40 text-sabbia label hover:bg-sabbia/10 transition-colors"
+            >
+              <MessageCircle size={16} /> Scrivici su WhatsApp
+            </a>
           </div>
         </div>
       </section>

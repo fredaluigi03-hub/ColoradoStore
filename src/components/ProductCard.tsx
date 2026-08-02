@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import type { Product } from '@/lib/shop/types';
 import { useCart } from '@/context/CartContext';
+import { formatPrice } from '@/lib/shop/site';
 
 export function getBadge(product: Product): { label: string; className: string } | null {
   if (!product.availableForSale) return { label: 'Esaurito', className: 'bg-inchiostro/70 text-carta' };
@@ -10,7 +11,7 @@ export function getBadge(product: Product): { label: string; className: string }
     const original = parseFloat(product.compareAtPriceRange.minVariantCompareAtPrice.amount);
     const current = parseFloat(product.priceRange.minVariantPrice.amount);
     const pct = Math.round((1 - current / original) * 100);
-    return { label: `-${pct}%`, className: 'bg-rame text-carta' };
+    if (pct > 0) return { label: `-${pct}%`, className: 'bg-rame text-carta' };
   }
   if (product.tags.includes('nuovo')) return { label: 'Nuovo', className: 'bg-sabbia text-inchiostro' };
   if (product.tags.includes('best-seller')) return { label: 'Best', className: 'bg-denim text-carta' };
@@ -23,9 +24,15 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const { addToCart } = useCart();
   const badge = getBadge(product);
-  const firstVariant = product.variants[0];
-  const hasDiscount = product.compareAtPriceRange;
-  const isLowStock = product.availableForSale && firstVariant.quantityAvailable <= 4;
+  // Il quick-add deve aggiungere una variante acquistabile, non la prima in lista.
+  const firstVariant = product.variants.find((v) => v.availableForSale) || product.variants[0];
+  const hasDiscount =
+    product.compareAtPriceRange &&
+    parseFloat(product.compareAtPriceRange.minVariantCompareAtPrice.amount) >
+      parseFloat(product.priceRange.minVariantPrice.amount);
+  // Se il capo ha più taglie, il quick-add ne sceglierebbe una a caso: meglio
+  // mandare alla scheda prodotto.
+  const needsChoice = product.options.some((o) => o.values.length > 1);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     const el = cardRef.current;
@@ -70,18 +77,6 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
             </span>
           )}
 
-          {/* Low stock badge */}
-          {isLowStock && !badge && (
-            <span className="absolute top-3 left-3 z-10 label px-2 py-1 bg-inchiostro/70 text-carta">
-              Ultimi pezzi
-            </span>
-          )}
-          {isLowStock && badge && !badge.label.includes('%') && !badge.label.includes('Esaurito') && (
-            <span className="absolute top-3 right-3 z-10 label px-2 py-1 bg-inchiostro/70 text-carta">
-              Ultimi pezzi
-            </span>
-          )}
-
           {/* Primary image */}
           <div className="aspect-[3/4] overflow-hidden">
             <img
@@ -115,21 +110,27 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
           )}
 
           {/* Quick-add */}
-          {product.availableForSale && (
+          {product.availableForSale && firstVariant && (
             <div
               className={`absolute bottom-0 left-0 right-0 p-3 transition-all duration-300 ${
                 hovered ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
               }`}
             >
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  addToCart(product, firstVariant);
-                }}
-                className="w-full py-3 bg-carta/95 backdrop-blur-sm text-inchiostro label hover:bg-sabbia transition-colors"
-              >
-                Aggiungi al carrello
-              </button>
+              {needsChoice ? (
+                <span className="block w-full py-3 bg-carta/95 backdrop-blur-sm text-inchiostro label text-center">
+                  Scegli la taglia
+                </span>
+              ) : (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    addToCart(product, firstVariant);
+                  }}
+                  className="w-full py-3 bg-carta/95 backdrop-blur-sm text-inchiostro label hover:bg-sabbia transition-colors"
+                >
+                  Aggiungi al carrello
+                </button>
+              )}
             </div>
           )}
 
@@ -153,11 +154,11 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
           </div>
           <div className="text-right flex-shrink-0">
             <p className="text-sm font-medium text-carta">
-              {parseFloat(product.priceRange.minVariantPrice.amount).toFixed(0)}€
+              {formatPrice(product.priceRange.minVariantPrice.amount, { round: true })}
             </p>
             {hasDiscount && (
               <p className="text-xs text-carta/40 line-through">
-                {parseFloat(product.compareAtPriceRange!.minVariantCompareAtPrice.amount).toFixed(0)}€
+                {formatPrice(product.compareAtPriceRange!.minVariantCompareAtPrice.amount, { round: true })}
               </p>
             )}
           </div>

@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { SlidersHorizontal, X, ChevronDown, LayoutGrid, Grid2x2, Grid3x3 } from 'lucide-react';
-import { getProducts, getCollection } from '@/lib/shop';
-import { editorialImages } from '@/lib/shop/mock-data';
+import { getProducts, getProductsByCollection, getCollection, matchesFilter } from '@/lib/shop';
+import { editorialImages } from '@/lib/shop/editorial';
+import { usePageMeta } from '@/lib/meta';
 import type { Product, CollectionFilter } from '@/lib/shop/types';
 import ProductCard from '@/components/ProductCard';
 
@@ -11,74 +12,133 @@ const SORT_OPTIONS = [
   { value: 'raccomandati', label: 'Raccomandati' },
   { value: 'prezzo-asc', label: 'Prezzo: crescente' },
   { value: 'prezzo-desc', label: 'Prezzo: decrescente' },
-  { value: 'novita', label: 'Novità' },
+  { value: 'sconto', label: 'Sconto maggiore' },
 ];
 
-const PRODUCT_TYPES = ['Camicie', 'Capispalla', 'Magliette e polo', 'Maglie e felpe', 'Pantaloni e jeans', 'Sneaker'];
-const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '28', '30', '32', '34', '36', '40', '41', '42', '43', '44', '45'];
-const COLORS = ['Bianco', 'Blu', 'Beige', 'Sabbia', 'Crema', 'Navy', 'Rosso', 'Marrone'];
-const BRANDS = ["Levi's", 'Colorado'];
+// I reparti che hanno senso filtrare per stile.
+const STYLE_CHOICE_HANDLES = ['uomo', 'donna', 'abbigliamento', 'abbigliamento-u', 'abbigliamento-d'];
+
+// Streetwear e Old Money sono linee editoriali nostre, non collection Shopify:
+// si costruiscono filtrando l'intero catalogo.
+const EDITORIAL_LINES: Record<string, { title: string; description: string; line: 'streetwear' | 'old-money' }> = {
+  streetwear: {
+    title: 'Streetwear',
+    description: 'Denim, felpe, sneaker e capi urban. Il lato giovane del negozio.',
+    line: 'streetwear',
+  },
+  'old-money': {
+    title: 'Old Money',
+    description: 'Camicie, maglieria, coordinati. Eleganza senza tempo.',
+    line: 'old-money',
+  },
+};
+
+const discountOf = (p: Product) => {
+  const before = p.compareAtPriceRange && parseFloat(p.compareAtPriceRange.minVariantCompareAtPrice.amount);
+  if (!before) return 0;
+  const now = parseFloat(p.priceRange.minVariantPrice.amount);
+  return before > now ? 1 - now / before : 0;
+};
 
 export default function CollectionPage() {
   const { handle } = useParams();
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [collectionProducts, setCollectionProducts] = useState<Product[]>([]);
   const [collectionTitle, setCollectionTitle] = useState('');
   const [collectionDesc, setCollectionDesc] = useState('');
+  const [notFound, setNotFound] = useState(false);
   const [filter, setFilter] = useState<CollectionFilter>({ linea: 'all' });
   const [sort, setSort] = useState('raccomandati');
   const [columns, setColumns] = useState(4);
   const [showFilters, setShowFilters] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(8);
-  const showStyleChoice = handle === 'uomo' || handle === 'donna' || handle === 'sneaker';
+  const [visibleCount, setVisibleCount] = useState(12);
+  const showStyleChoice = STYLE_CHOICE_HANDLES.includes(handle || '');
+
+  usePageMeta({
+    title: collectionTitle ? `${collectionTitle} · Colorado Store Avellino` : 'Catalogo · Colorado Store',
+    description:
+      collectionDesc ||
+      `${collectionTitle || 'Catalogo'} — Colorado Store, rivenditore ufficiale Levi's ad Avellino. Spedizione in 24/48h.`,
+  });
 
   useEffect(() => {
-    getProducts().then(setAllProducts);
-    if (handle) {
-      getCollection(handle).then((c) => {
-        if (c) {
-          setCollectionTitle(c.title);
-          setCollectionDesc(c.description);
-        }
+    if (!handle) return;
+    let alive = true;
+    setNotFound(false);
+    setVisibleCount(12);
+
+    const editorial = EDITORIAL_LINES[handle];
+    if (editorial) {
+      getProducts().then((all) => {
+        if (!alive) return;
+        setCollectionTitle(editorial.title);
+        setCollectionDesc(editorial.description);
+        setCollectionProducts(all.filter((p) => p.tagsLine.includes(editorial.line)));
+      });
+    } else {
+      Promise.all([getCollection(handle), getProductsByCollection(handle)]).then(([c, list]) => {
+        if (!alive) return;
+        setCollectionTitle(c?.title || '');
+        setCollectionDesc(c?.description || '');
+        setCollectionProducts(list);
+        setNotFound(!c);
       });
     }
+    return () => {
+      alive = false;
+    };
   }, [handle]);
 
-  // Determina la linea dal handle della collezione
+  // Sulle pagine di linea il filtro è già applicato dalla collezione stessa:
+  // riapplicarlo nel pannello sarebbe ridondante.
   useEffect(() => {
-    if (handle === 'streetwear') setFilter((f) => ({ ...f, linea: 'streetwear' }));
-    else if (handle === 'old-money') setFilter((f) => ({ ...f, linea: 'old-money' }));
-    else setFilter((f) => ({ ...f, linea: 'all' }));
+    setFilter({ linea: 'all' });
   }, [handle]);
+
+  // I valori dei filtri escono dai prodotti realmente presenti: niente taglie
+  // o colori che non darebbero risultati.
+  const facets = useMemo(() => {
+    const types = new Set<string>();
+    const sizes = new Set<string>();
+    const colors = new Set<string>();
+    const brands = new Set<string>();
+    let maxPrice = 0;
+    for (const p of collectionProducts) {
+      if (p.productType) types.add(p.productType);
+      if (p.vendor) brands.add(p.vendor);
+      for (const o of p.options) {
+        if (o.name === 'Taglia') o.values.forEach((v) => sizes.add(v));
+        if (o.name === 'Colore') o.values.forEach((v) => colors.add(v));
+      }
+      maxPrice = Math.max(maxPrice, parseFloat(p.priceRange.maxVariantPrice.amount));
+    }
+    const numeric = (a: string, b: string) => {
+      const na = parseFloat(a);
+      const nb = parseFloat(b);
+      if (!isNaN(na) && !isNaN(nb)) return na - nb;
+      return a.localeCompare(b);
+    };
+    return {
+      types: [...types].sort(),
+      sizes: [...sizes].sort(numeric),
+      colors: [...colors].sort(),
+      brands: [...brands].sort(),
+      maxPrice: Math.ceil(maxPrice / 10) * 10 || 300,
+    };
+  }, [collectionProducts]);
 
   const filteredProducts = useMemo(() => {
-    let result = allProducts;
+    const result = collectionProducts.filter((p) => matchesFilter(p, filter));
 
-    // Filter by collection handle
-    if (handle && handle !== 'streetwear' && handle !== 'old-money' && handle !== 'outlet') {
-      if (handle === 'uomo') result = result.filter((p) => p.tags.includes('uomo'));
-      else if (handle === 'donna') result = result.filter((p) => p.tags.includes('donna'));
-      else if (handle === 'sneaker') result = result.filter((p) => p.tags.includes('sneaker'));
-      else if (handle === 'levis') result = result.filter((p) => p.tags.includes('levis'));
-      else if (handle === 'nuovi-arrivi') result = result.filter((p) => p.tags.includes('nuovo'));
-      else if (handle === 'best-seller') result = result.filter((p) => p.tags.includes('best-seller'));
-    }
-
-    // Apply filters
-    if (filter.linea && filter.linea !== 'all') result = result.filter((p) => p.tagsLine.includes(filter.linea as 'streetwear' | 'old-money'));
-    if (filter.outlet) result = result.filter((p) => p.tags.includes('outlet'));
-    if (filter.productType) result = result.filter((p) => p.productType === filter.productType);
-    if (filter.brand) result = result.filter((p) => p.vendor === filter.brand);
-    if (filter.taglia) result = result.filter((p) => p.options.some((o) => o.name === 'Taglia' && o.values.includes(filter.taglia!)));
-    if (filter.colore) result = result.filter((p) => p.options.some((o) => o.name === 'Colore' && o.values.some((v) => v.toLowerCase().includes(filter.colore!.toLowerCase()))));
-    if (filter.prezzoMax) result = result.filter((p) => parseFloat(p.priceRange.minVariantPrice.amount) <= filter.prezzoMax!);
-
-    // Sort
-    if (sort === 'prezzo-asc') result = [...result].sort((a, b) => parseFloat(a.priceRange.minVariantPrice.amount) - parseFloat(b.priceRange.minVariantPrice.amount));
-    else if (sort === 'prezzo-desc') result = [...result].sort((a, b) => parseFloat(b.priceRange.minVariantPrice.amount) - parseFloat(a.priceRange.minVariantPrice.amount));
-    else if (sort === 'novita') result = [...result].sort((a, b) => (b.tags.includes('nuovo') ? 1 : 0) - (a.tags.includes('nuovo') ? 1 : 0));
+    if (sort === 'prezzo-asc')
+      result.sort((a, b) => parseFloat(a.priceRange.minVariantPrice.amount) - parseFloat(b.priceRange.minVariantPrice.amount));
+    else if (sort === 'prezzo-desc')
+      result.sort((a, b) => parseFloat(b.priceRange.minVariantPrice.amount) - parseFloat(a.priceRange.minVariantPrice.amount));
+    else if (sort === 'sconto') result.sort((a, b) => discountOf(b) - discountOf(a));
+    // Di default i disponibili vengono prima: gli esauriti non convertono.
+    else result.sort((a, b) => Number(b.availableForSale) - Number(a.availableForSale));
 
     return result;
-  }, [allProducts, handle, filter, sort]);
+  }, [collectionProducts, filter, sort]);
 
   const visibleProducts = filteredProducts.slice(0, visibleCount);
   const activeFilters: { key: string; label: string }[] = [];
@@ -89,7 +149,9 @@ export default function CollectionPage() {
   if (filter.prezzoMax) activeFilters.push({ key: 'prezzoMax', label: `Fino a ${filter.prezzoMax}€` });
   if (filter.linea && filter.linea !== 'all') activeFilters.push({ key: 'linea', label: filter.linea === 'streetwear' ? 'Streetwear' : 'Old Money' });
 
+  // "linea" non ha uno stato assente: azzerarla significa riportarla a 'all'.
   const clearFilter = (key: string) => setFilter((f) => {
+    if (key === 'linea') return { ...f, linea: 'all' };
     const next = { ...f };
     delete (next as Record<string, unknown>)[key];
     return next;
@@ -103,15 +165,24 @@ export default function CollectionPage() {
       <div className="mx-auto max-w-[1600px] px-4 md:px-8 py-12 md:py-16">
         <span className="label text-sabbia">Collezione</span>
         <h1 className="display-text text-carta text-5xl md:text-7xl mt-2">
-          <em>{collectionTitle || 'Catalogo'}</em>
+          <em>{collectionTitle || (notFound ? 'Collezione non trovata' : 'Catalogo')}</em>
         </h1>
         {collectionDesc && <p className="text-carta/60 mt-4 max-w-xl text-sm">{collectionDesc}</p>}
+        {notFound && (
+          <p className="text-carta/60 mt-4 max-w-xl text-sm">
+            Questa collezione non esiste più.{' '}
+            <Link to="/collezioni/new-collection" className="text-sabbia hover:text-carta transition-colors">
+              Vedi i nuovi arrivi
+            </Link>
+            .
+          </p>
+        )}
       </div>
 
       {showStyleChoice && (
         <section className="mx-auto max-w-[1600px] px-4 md:px-8 pb-10 md:pb-14">
           <div className="border-t border-carta/10 pt-8 md:pt-10"><div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-6"><div><span className="label text-sabbia">Due anime</span><h2 className="display-text text-3xl md:text-5xl mt-1">Quale stile scegli <em className="text-sabbia">oggi?</em></h2></div><button onClick={() => setFilter((current) => ({ ...current, linea: 'all' }))} className="label text-carta/60 hover:text-carta">Mostra tutto il reparto</button></div>
-            <div className="grid md:grid-cols-2 gap-4"><button type="button" onClick={() => setFilter((current) => ({ ...current, linea: 'streetwear' }))} className={`relative min-h-[250px] overflow-hidden text-left group border ${filter.linea === 'streetwear' ? 'border-sabbia' : 'border-carta/10'}`}><img src={editorialImages.streetwear} alt="Streetwear" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" /><div className="absolute inset-0 bg-gradient-to-t from-inchiostro/90 via-inchiostro/15 to-inchiostro/20" /><div className="absolute bottom-0 p-6"><span className="label text-carta/60">Energia urbana</span><span className="block display-text text-carta text-4xl mt-1"><em>Streetwear</em></span></div></button><button type="button" onClick={() => setFilter((current) => ({ ...current, linea: 'old-money' }))} className={`relative min-h-[250px] overflow-hidden text-left group border ${filter.linea === 'old-money' ? 'border-sabbia' : 'border-carta/10'}`}><img src={editorialImages.oldMoney} alt="Old Money" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" /><div className="absolute inset-0 bg-gradient-to-t from-carta/90 via-carta/10 to-carta/20" /><div className="absolute bottom-0 p-6 text-inchiostro"><span className="label opacity-60">Eleganza senza tempo</span><span className="block display-text text-4xl mt-1"><em>Old Money</em></span></div></button></div>
+            <div className="grid md:grid-cols-2 gap-4"><button type="button" onClick={() => setFilter((current) => ({ ...current, linea: 'streetwear' }))} className={`relative min-h-[250px] overflow-hidden text-left group border ${filter.linea === 'streetwear' ? 'border-sabbia' : 'border-carta/10'}`}><img src={editorialImages.streetwear.url} alt={editorialImages.streetwear.alt} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" /><div className="absolute inset-0 bg-gradient-to-t from-inchiostro/90 via-inchiostro/15 to-inchiostro/20" /><div className="absolute bottom-0 p-6"><span className="label text-carta/60">Energia urbana</span><span className="block display-text text-carta text-4xl mt-1"><em>Streetwear</em></span></div></button><button type="button" onClick={() => setFilter((current) => ({ ...current, linea: 'old-money' }))} className={`relative min-h-[250px] overflow-hidden text-left group border ${filter.linea === 'old-money' ? 'border-sabbia' : 'border-carta/10'}`}><img src={editorialImages.oldMoney.url} alt={editorialImages.oldMoney.alt} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" /><div className="absolute inset-0 bg-gradient-to-t from-carta/90 via-carta/10 to-carta/20" /><div className="absolute bottom-0 p-6 text-inchiostro"><span className="label opacity-60">Eleganza senza tempo</span><span className="block display-text text-4xl mt-1"><em>Old Money</em></span></div></button></div>
           </div>
         </section>
       )}
@@ -180,70 +251,83 @@ export default function CollectionPage() {
           className="overflow-hidden border-b border-carta/10 bg-inchiostro-400"
         >
           <div className="mx-auto max-w-[1600px] px-4 md:px-8 py-6 grid md:grid-cols-6 gap-6">
-            <FilterGroup label="Categoria">
-              {PRODUCT_TYPES.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setFilter((f) => ({ ...f, productType: f.productType === t ? undefined : t }))}
-                  className={`block text-sm py-1 ${filter.productType === t ? 'text-sabbia' : 'text-carta/60 hover:text-carta'}`}
-                >
-                  {t}
-                </button>
-              ))}
-            </FilterGroup>
-            <FilterGroup label="Taglia">
-              <div className="flex flex-wrap gap-1.5">
-                {SIZES.map((s) => (
+            {facets.types.length > 1 && (
+              <FilterGroup label="Categoria">
+                {facets.types.map((t) => (
                   <button
-                    key={s}
-                    onClick={() => setFilter((f) => ({ ...f, taglia: f.taglia === s ? undefined : s }))}
-                    className={`px-2.5 py-1.5 text-xs border ${filter.taglia === s ? 'border-sabbia text-sabbia' : 'border-carta/20 text-carta/60 hover:border-carta/50'} transition-colors`}
+                    key={t}
+                    onClick={() => setFilter((f) => ({ ...f, productType: f.productType === t ? undefined : t }))}
+                    className={`block text-sm py-1 ${filter.productType === t ? 'text-sabbia' : 'text-carta/60 hover:text-carta'}`}
                   >
-                    {s}
+                    {t}
                   </button>
                 ))}
-              </div>
-            </FilterGroup>
-            <FilterGroup label="Colore">
-              {COLORS.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setFilter((f) => ({ ...f, colore: f.colore === c ? undefined : c }))}
-                  className={`block text-sm py-1 ${filter.colore === c ? 'text-sabbia' : 'text-carta/60 hover:text-carta'}`}
-                >
-                  {c}
-                </button>
-              ))}
-            </FilterGroup>
+              </FilterGroup>
+            )}
+            {facets.sizes.length > 0 && (
+              <FilterGroup label="Taglia">
+                <div className="flex flex-wrap gap-1.5">
+                  {facets.sizes.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setFilter((f) => ({ ...f, taglia: f.taglia === s ? undefined : s }))}
+                      className={`px-2.5 py-1.5 text-xs border ${filter.taglia === s ? 'border-sabbia text-sabbia' : 'border-carta/20 text-carta/60 hover:border-carta/50'} transition-colors`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </FilterGroup>
+            )}
+            {facets.colors.length > 0 && (
+              <FilterGroup label="Colore">
+                <div className="max-h-48 overflow-y-auto no-scrollbar">
+                  {facets.colors.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setFilter((f) => ({ ...f, colore: f.colore === c ? undefined : c }))}
+                      className={`block text-sm py-1 text-left ${filter.colore === c ? 'text-sabbia' : 'text-carta/60 hover:text-carta'}`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </FilterGroup>
+            )}
             <FilterGroup label="Prezzo">
               <input
                 type="range"
-                min={30}
-                max={300}
+                min={10}
+                max={facets.maxPrice}
                 step={10}
-                value={filter.prezzoMax || 300}
+                value={filter.prezzoMax || facets.maxPrice}
                 onChange={(e) => setFilter((f) => ({ ...f, prezzoMax: parseInt(e.target.value) }))}
                 className="w-full accent-sabbia"
+                aria-label="Prezzo massimo"
               />
-              <p className="text-sm text-carta/60 mt-2">Fino a {filter.prezzoMax || 300}€</p>
+              <p className="text-sm text-carta/60 mt-2">Fino a {filter.prezzoMax || facets.maxPrice}€</p>
             </FilterGroup>
-            <FilterGroup label="Brand">
-              {BRANDS.map((b) => (
-                <button
-                  key={b}
-                  onClick={() => setFilter((f) => ({ ...f, brand: f.brand === b ? undefined : b }))}
-                  className={`block text-sm py-1 ${filter.brand === b ? 'text-sabbia' : 'text-carta/60 hover:text-carta'}`}
-                >
-                  {b}
-                </button>
-              ))}
-            </FilterGroup>
+            {facets.brands.length > 1 && (
+              <FilterGroup label="Brand">
+                <div className="max-h-48 overflow-y-auto no-scrollbar">
+                  {facets.brands.map((b) => (
+                    <button
+                      key={b}
+                      onClick={() => setFilter((f) => ({ ...f, brand: f.brand === b ? undefined : b }))}
+                      className={`block text-sm py-1 text-left ${filter.brand === b ? 'text-sabbia' : 'text-carta/60 hover:text-carta'}`}
+                    >
+                      {b}
+                    </button>
+                  ))}
+                </div>
+              </FilterGroup>
+            )}
             <FilterGroup label="Linea">
-              {['streetwear', 'old-money'].map((l) => (
+              {(['streetwear', 'old-money'] as const).map((l) => (
                 <button
                   key={l}
-                  onClick={() => setFilter((f) => ({ ...f, linea: f.linea === l ? 'all' : l as 'streetwear' | 'old-money' }))}
-                  className={`block text-sm py-1 capitalize ${filter.linea === l ? 'text-sabbia' : 'text-carta/60 hover:text-carta'}`}
+                  onClick={() => setFilter((f) => ({ ...f, linea: f.linea === l ? 'all' : l }))}
+                  className={`block text-sm py-1 ${filter.linea === l ? 'text-sabbia' : 'text-carta/60 hover:text-carta'}`}
                 >
                   {l === 'old-money' ? 'Old Money' : 'Streetwear'}
                 </button>
@@ -273,7 +357,7 @@ export default function CollectionPage() {
         {visibleCount < filteredProducts.length && (
           <div className="text-center mt-12">
             <button
-              onClick={() => setVisibleCount((c) => c + 8)}
+              onClick={() => setVisibleCount((c) => c + 12)}
               className="px-8 py-4 border border-carta/30 label text-carta hover:bg-carta/10 transition-colors"
             >
               Carica altri

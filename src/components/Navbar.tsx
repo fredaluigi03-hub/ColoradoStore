@@ -4,22 +4,90 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ShoppingBag, Menu, X } from 'lucide-react';
 import { useScrollDirection } from '@/lib/hooks';
 import { useCart } from '@/context/CartContext';
-import { collections, editorialImages } from '@/lib/shop/mock-data';
+import { getProducts } from '@/lib/shop';
+import { editorialImages } from '@/lib/shop/editorial';
+import { formatPrice } from '@/lib/shop/site';
+import type { Product } from '@/lib/shop/types';
 
-const MEGA_MENU: Record<string, { label: string; items: string[] }[]> = {
+// Le voci rispecchiano le collection reali su Shopify.
+const MEGA_MENU: Record<string, { label: string; items: { label: string; handle: string }[] }[]> = {
   uomo: [
-    { label: 'Magliette e polo', items: ['Magliette', 'Polo', 'T-shirt'] },
-    { label: 'Camicie', items: ['Oxford', 'Lino', 'Flanella'] },
-    { label: 'Maglie e felpe', items: ['Cashmere', 'Cardigan', 'Felpa'] },
-    { label: 'Pantaloni e jeans', items: ['Jeans', 'Chino', 'Sigaretta'] },
-    { label: 'Capispalla', items: ['Giacca', 'Bomber', 'Trench'] },
+    {
+      label: 'Abbigliamento',
+      items: [
+        { label: 'T-shirt e polo', handle: 't-shirt-u' },
+        { label: 'Felpe', handle: 'felpe-u' },
+        { label: 'Maglieria', handle: 'maglieria-u' },
+        { label: 'Camicie', handle: 'camicie-uomo' },
+      ],
+    },
+    {
+      label: 'Pantaloni',
+      items: [
+        { label: 'Pantaloni', handle: 'pantaloni-u' },
+        { label: 'Jeans', handle: 'jeans' },
+        { label: 'Coordinati', handle: 'coordinati-uomo' },
+      ],
+    },
+    {
+      label: 'Capispalla',
+      items: [{ label: 'Giubbini', handle: 'giubbini-uomo' }],
+    },
+    {
+      label: 'Scarpe',
+      items: [
+        { label: 'Tutte le scarpe', handle: 'scarpe-uomo' },
+        { label: 'Sneaker', handle: 'sneakers-uomo' },
+      ],
+    },
+    {
+      label: 'Brand',
+      items: [
+        { label: "Levi's", handle: 'levis-uomo' },
+        { label: 'Black Island', handle: 'black-island' },
+        { label: 'Jack & Jones', handle: 'jack-jones' },
+        { label: 'Dr. Martens', handle: 'dr-martens' },
+      ],
+    },
   ],
   donna: [
-    { label: 'Magliette e top', items: ['Top', 'T-shirt', 'Bodysuit'] },
-    { label: 'Camicie', items: ['Seta', 'Lino', 'Popeline'] },
-    { label: 'Maglie e felpe', items: ['Cashmere', 'Cardigan', 'Felpa'] },
-    { label: 'Pantaloni e jeans', items: ['Jeans', 'Palazzo', 'Sigaretta'] },
-    { label: 'Capispalla', items: ['Trench', 'Camoscio', 'Bomber'] },
+    {
+      label: 'Abbigliamento',
+      items: [
+        { label: 'Maglie e top', handle: 't-shirt-d' },
+        { label: 'Felpe', handle: 'felpe-d' },
+        { label: 'Maglieria', handle: 'maglieria-d' },
+        { label: 'Camicie', handle: 'camicie' },
+      ],
+    },
+    {
+      label: 'Pantaloni e abiti',
+      items: [
+        { label: 'Pantaloni', handle: 'pantaloni-d' },
+        { label: 'Abiti e tute', handle: 'abiti-donna' },
+        { label: 'Coordinati', handle: 'coordinati-donna' },
+      ],
+    },
+    {
+      label: 'Capispalla',
+      items: [{ label: 'Giubbini', handle: 'giubbini-donna' }],
+    },
+    {
+      label: 'Scarpe',
+      items: [
+        { label: 'Tutte le scarpe', handle: 'scarpe-donna' },
+        { label: 'Sneaker', handle: 'sneakers-donna' },
+      ],
+    },
+    {
+      label: 'Brand',
+      items: [
+        { label: "Levi's", handle: 'levis-donna' },
+        { label: 'JJXX', handle: 'jjxx' },
+        { label: 'Guess', handle: 'guess' },
+        { label: 'Vicolo', handle: 'vicolo' },
+      ],
+    },
   ],
 };
 
@@ -28,10 +96,18 @@ const NAV_LINKS = [
   { label: 'Donna', to: '/collezioni/donna', mega: 'donna' },
   { label: "Levi's", to: '/collezioni/levis' },
   { label: 'Streetwear', to: '/collezioni/streetwear' },
-  { label: 'Old Money', to: '/collezioni/old-money' },
-  { label: 'Sneaker', to: '/collezioni/sneaker' },
+  { label: 'Sneaker', to: '/collezioni/sneakers' },
   { label: 'Outlet', to: '/collezioni/outlet' },
   { label: 'Chi Siamo', to: '/chi-siamo' },
+];
+
+const QUICK_LINKS = [
+  { title: 'Nuovi arrivi', handle: 'new-collection' },
+  { title: 'Best seller', handle: 'best-sellers' },
+  { title: "Levi's", handle: 'levis' },
+  { title: 'Sneaker', handle: 'sneakers' },
+  { title: 'Outlet', handle: 'outlet' },
+  { title: 'Streetwear', handle: 'streetwear' },
 ];
 
 export default function Navbar() {
@@ -42,6 +118,7 @@ export default function Navbar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [megaImage, setMegaImage] = useState(editorialImages.uomoDept);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const navigate = useNavigate();
   const location = useLocation();
   const closeTimer = useRef<number | null>(null);
@@ -52,9 +129,24 @@ export default function Navbar() {
     setSearchOpen(false);
   }, [location.pathname]);
 
-  const searchResults = searchQuery.length > 1
-    ? collections.filter((c) => c.title.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 5)
-    : [];
+  // Il catalogo si carica solo quando l'utente apre la ricerca.
+  useEffect(() => {
+    if (!searchOpen || allProducts.length) return;
+    getProducts().then(setAllProducts);
+  }, [searchOpen, allProducts.length]);
+
+  const query = searchQuery.trim().toLowerCase();
+  const searchResults =
+    query.length > 1
+      ? allProducts
+          .filter(
+            (p) =>
+              p.title.toLowerCase().includes(query) ||
+              p.vendor.toLowerCase().includes(query) ||
+              p.productType.toLowerCase().includes(query),
+          )
+          .slice(0, 6)
+      : [];
 
   return (
     <>
@@ -99,6 +191,13 @@ export default function Navbar() {
                   <div
                     key={link.label}
                     className="relative"
+                    // Anche su focus: il mega menu era raggiungibile solo col
+                    // mouse, e le sue sottocategorie non stanno altrove.
+                    onFocus={() => {
+                      if (closeTimer.current) clearTimeout(closeTimer.current);
+                      setMegaOpen(link.mega ?? null);
+                      if (link.mega) setMegaImage(link.mega === 'uomo' ? editorialImages.uomoDept : editorialImages.donnaDept);
+                    }}
                     onMouseEnter={() => {
                       if (closeTimer.current) clearTimeout(closeTimer.current);
                       if (link.mega) {
@@ -170,12 +269,12 @@ export default function Navbar() {
                         <h4 className="label-lg text-sabbia mb-3">{cat.label}</h4>
                         <ul className="space-y-2">
                           {cat.items.map((item) => (
-                            <li key={item}>
+                            <li key={item.handle}>
                               <Link
-                                to={`/collezioni/${megaOpen}`}
+                                to={`/collezioni/${item.handle}`}
                                 className="text-sm text-carta/70 hover:text-carta transition-colors"
                               >
-                                {item}
+                                {item.label}
                               </Link>
                             </li>
                           ))}
@@ -185,8 +284,8 @@ export default function Navbar() {
                   </div>
                   <div className="w-64 h-48 flex-shrink-0 overflow-hidden rounded-sm">
                     <img
-                      src={megaImage}
-                      alt="Anteprima reparto"
+                      src={megaImage.url}
+                      alt={megaImage.alt}
                       className="w-full h-full object-cover transition-transform duration-500"
                     />
                   </div>
@@ -263,26 +362,45 @@ export default function Navbar() {
                 />
               </div>
               {searchResults.length > 0 && (
-                <div className="mt-6 space-y-2">
-                  <span className="label text-sabbia">Suggerimenti</span>
-                  {searchResults.map((c) => (
+                <div className="mt-6 space-y-1 max-h-[55vh] overflow-y-auto">
+                  <span className="label text-sabbia">Prodotti</span>
+                  {searchResults.map((p) => (
                     <button
-                      key={c.id}
-                      onClick={() => navigate(`/collezioni/${c.handle}`)}
-                      className="block w-full text-left py-2 text-carta/80 hover:text-carta transition-colors"
+                      key={p.id}
+                      onClick={() => navigate(`/prodotti/${p.handle}`)}
+                      className="flex items-center gap-4 w-full text-left py-2 group"
                     >
-                      {c.title}
+                      <img
+                        src={p.featuredImage.url}
+                        alt=""
+                        width={48}
+                        height={64}
+                        loading="lazy"
+                        className="w-12 h-16 object-cover flex-shrink-0 bg-inchiostro-300"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="label text-sabbia block">{p.vendor}</span>
+                        <span className="text-sm text-carta/80 group-hover:text-carta transition-colors block truncate">
+                          {p.title}
+                        </span>
+                      </span>
+                      <span className="text-sm text-carta flex-shrink-0">
+                        {formatPrice(p.priceRange.minVariantPrice.amount, { round: true })}
+                      </span>
                     </button>
                   ))}
                 </div>
+              )}
+              {query.length > 1 && searchResults.length === 0 && allProducts.length > 0 && (
+                <p className="mt-6 text-sm text-carta/50">Nessun prodotto trovato per “{searchQuery}”.</p>
               )}
               {!searchQuery && (
                 <div className="mt-6">
                   <span className="label text-sabbia">Collezioni in evidenza</span>
                   <div className="flex flex-wrap gap-2 mt-3">
-                    {collections.slice(0, 6).map((c) => (
+                    {QUICK_LINKS.map((c) => (
                       <button
-                        key={c.id}
+                        key={c.handle}
                         onClick={() => navigate(`/collezioni/${c.handle}`)}
                         className="px-4 py-2 border border-carta/20 rounded-full text-sm text-carta/70 hover:text-carta hover:border-carta/50 transition-all"
                       >
