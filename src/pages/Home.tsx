@@ -527,7 +527,7 @@ function SneakerShowcase() {
           {/* VIDEO ANIMATO HERO */}
           <div className="lg:col-span-8 relative rounded-3xl overflow-hidden border border-carta/15 shadow-2xl bg-black aspect-video lg:aspect-[16/10] group">
             <video
-              src="/assets/sneackers/hero.mp4"
+              src={`${import.meta.env.BASE_URL}assets/sneackers/hero.mp4`}
               autoPlay
               loop
               muted
