@@ -305,12 +305,12 @@ function Ticker() {
   ];
 
   return (
-    <div className="border-y border-carta/10 py-4 overflow-hidden bg-inchiostro">
+    <div className="border-y border-carta/20 py-4.5 overflow-hidden bg-inchiostro">
       <div className="flex animate-marquee whitespace-nowrap">
         {[...tickerItems, ...tickerItems, ...tickerItems].map((item, i) => (
-          <span key={i} className="label text-carta/60 mx-8 flex items-center gap-8">
+          <span key={i} className="label text-white font-bold text-sm tracking-widest mx-8 flex items-center gap-8 drop-shadow-sm">
             {item}
-            <span className="text-sabbia">✦</span>
+            <span className="text-sabbia text-base">✦</span>
           </span>
         ))}
       </div>
