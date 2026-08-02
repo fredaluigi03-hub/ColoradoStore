@@ -17,6 +17,7 @@ export function useLenis() {
         smoothWheel: true,
         touchMultiplier: 1.5,
       });
+      (window as any).lenis = lenis;
       const raf = (time: number) => {
         lenis?.raf(time);
         rafId = requestAnimationFrame(raf);

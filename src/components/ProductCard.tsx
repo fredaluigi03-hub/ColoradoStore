@@ -117,7 +117,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
               }`}
             >
               {needsChoice ? (
-                <span className="block w-full py-3 bg-carta/95 backdrop-blur-sm text-inchiostro label text-center">
+                <span className="btn-3d block w-full py-3 bg-carta/95 backdrop-blur-sm text-inchiostro label text-center font-bold">
                   Scegli la taglia
                 </span>
               ) : (
@@ -126,7 +126,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                     e.preventDefault();
                     addToCart(product, firstVariant);
                   }}
-                  className="w-full py-3 bg-carta/95 backdrop-blur-sm text-inchiostro label hover:bg-sabbia transition-colors"
+                  className="btn-3d-gold w-full py-3 bg-sabbia text-inchiostro label font-bold shadow-lg"
                 >
                   Aggiungi al carrello
                 </button>

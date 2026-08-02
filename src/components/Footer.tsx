@@ -112,12 +112,28 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-12 pt-8 border-t border-carta/10 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="mt-12 pt-8 border-t border-carta/10 flex flex-col md:flex-row justify-between items-center gap-6">
           <p className="text-carta/40 text-xs text-center md:text-left">
             © {new Date().getFullYear()} {STORE.legalName} · {STORE.address}, {STORE.zip} {STORE.city} ({STORE.province}) · P.IVA {STORE.vat}
           </p>
-          <div className="flex items-center gap-3">
-            <span className="label text-carta/40">Spedizione gratuita da {SHIPPING.freeThreshold}€</span>
+
+          {/* PULSANTI 3D IMMERSIVI PER NAVIGAZIONE RAPIDA */}
+          <div className="flex items-center gap-4">
+            <Link
+              to="/"
+              className="btn-3d px-5 py-2.5 rounded-full border border-carta/20 bg-inchiostro-300 text-carta label text-[10px] tracking-widest flex items-center gap-2"
+            >
+              <span>🏠 VAI ALLA HOME</span>
+            </Link>
+            <button
+              onClick={() => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                if ((window as any).lenis) (window as any).lenis.scrollTo(0);
+              }}
+              className="btn-3d-gold px-5 py-2.5 rounded-full bg-sabbia text-inchiostro label text-[10px] font-bold tracking-widest flex items-center gap-2 shadow-lg"
+            >
+              <span>⬆ TORNA IN CIMA</span>
+            </button>
           </div>
         </div>
       </div>

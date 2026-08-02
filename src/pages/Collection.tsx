@@ -358,12 +358,31 @@ export default function CollectionPage() {
           <div className="text-center mt-12">
             <button
               onClick={() => setVisibleCount((c) => c + 12)}
-              className="px-8 py-4 border border-carta/30 label text-carta hover:bg-carta/10 transition-colors"
+              className="btn-3d-gold px-8 py-4 rounded-full bg-sabbia text-inchiostro label font-bold tracking-widest transition-all"
             >
-              Carica altri
+              CARICA ALTRI PRODOTTI
             </button>
           </div>
         )}
+
+        {/* CONTROLI 3D NAVIGAZIONE A FINE CATEGORIA */}
+        <div className="mt-16 pt-8 border-t border-carta/10 flex items-center justify-center gap-4">
+          <Link
+            to="/"
+            className="btn-3d px-6 py-3 rounded-full border border-carta/20 bg-inchiostro-300 text-carta label text-xs tracking-widest flex items-center gap-2"
+          >
+            <span>🏠 TORNA ALLA HOME</span>
+          </Link>
+          <button
+            onClick={() => {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              if ((window as any).lenis) (window as any).lenis.scrollTo(0);
+            }}
+            className="btn-3d-gold px-6 py-3 rounded-full bg-sabbia text-inchiostro label text-xs font-bold tracking-widest flex items-center gap-2 shadow-xl"
+          >
+            <span>⬆ TORNA IN CIMA</span>
+          </button>
+        </div>
       </div>
     </div>
   );
