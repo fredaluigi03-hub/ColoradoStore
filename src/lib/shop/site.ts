@@ -20,7 +20,15 @@ export const STORE = {
     { days: 'Domenica', time: 'Chiuso' },
   ],
   openingHoursSchema: ['Mo-Sa 09:00-13:00', 'Mo-Sa 16:30-20:00'],
+  // Geocodifica OpenStreetMap di Via Dante Alighieri, Avellino. OSM non mappa
+  // il civico 34/36: il pin è preciso sulla via, non sulla porta. Le indicazioni
+  // usano l'indirizzo testuale, che Google risolve al civico esatto.
+  coords: { lat: 40.9144857, lng: 14.7858311 },
 } as const;
+
+export const STORE_FULL_ADDRESS = `${STORE.address}, ${STORE.zip} ${STORE.city} ${STORE.province}`;
+
+export const STORE_DIRECTIONS_URL = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(STORE_FULL_ADDRESS)}`;
 
 export const SOCIAL = {
   instagram: 'https://www.instagram.com/_colorado__store',

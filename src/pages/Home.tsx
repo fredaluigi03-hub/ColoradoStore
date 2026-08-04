@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, Plus, RotateCw, Instagram, Star } from 'lucide-react';
+import { ArrowRight, Plus, RotateCw, Instagram, Star, MessageCircle } from 'lucide-react';
 import { useLenis, useInView, useCountUp, useMouseParallax, use360Spin } from '@/lib/hooks';
 import { getProducts, getProductsByCollection } from '@/lib/shop';
-import { editorialImages, galleryImages, spinFrames } from '@/lib/shop/editorial';
-import { SOCIAL, SHIPPING, formatPrice } from '@/lib/shop/site';
+import { editorialImages, spinFrames } from '@/lib/shop/editorial';
+import { SOCIAL, SHIPPING, STORE, STORE_FULL_ADDRESS, STORE_DIRECTIONS_URL, formatPrice } from '@/lib/shop/site';
+import { TikTokIcon } from '@/components/icons';
 import type { Product } from '@/lib/shop/types';
 import { usePageMeta } from '@/lib/meta';
 import ProductCard from '@/components/ProductCard';
@@ -834,46 +835,154 @@ function Manifesto() {
   );
 }
 
-// ── 10 SOCIAL ──
-// Le immagini sono capi reali del catalogo, non post Instagram: il collegamento
-// a un feed vero richiede la Instagram Basic Display API.
+// ── 10 SEGUICI ──
+// Mappa 3D senza librerie: tasselli OpenStreetMap su un piano inclinato con
+// perspective/rotateX. Three.js o Mapbox costerebbero centinaia di KB (e Mapbox
+// anche una chiave API) per un pin fermo su un indirizzo che non cambia mai.
+const MAP_ZOOM = 17;
+const TILE = 256;
+// Proiezione slippy-map standard: lat/lng → coordinate tassello frazionarie.
+const tileCount = 2 ** MAP_ZOOM;
+const mapFx = ((STORE.coords.lng + 180) / 360) * tileCount;
+const mapFy = ((1 - Math.asinh(Math.tan((STORE.coords.lat * Math.PI) / 180)) / Math.PI) / 2) * tileCount;
+const mapTx = Math.floor(mapFx);
+const mapTy = Math.floor(mapFy);
+// Griglia 3×3 centrata sul tassello del negozio: copre il piano anche inclinato.
+const MAP_TILES = [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => ({ dx, dy })));
+// Posizione del negozio in px dentro la griglia.
+const PIN_LEFT = (mapFx - (mapTx - 1)) * TILE;
+const PIN_TOP = (mapFy - (mapTy - 1)) * TILE;
+const MAP_TILT = 54;
+
+const SOCIALS = [
+  { name: 'Instagram', href: SOCIAL.instagram, label: `Instagram di ${STORE.name}, ${SOCIAL.instagramHandle}`, Icon: Instagram },
+  { name: 'TikTok', href: SOCIAL.tiktok, label: `TikTok di ${STORE.name}, ${SOCIAL.tiktokHandle}`, Icon: TikTokIcon },
+  { name: 'WhatsApp', href: SOCIAL.whatsapp, label: `Scrivi a ${STORE.name} su WhatsApp`, Icon: MessageCircle },
+];
+
 function SocialGrid() {
+  const parallax = useMouseParallax(0.015);
+  // loading="lazy" non scatta dentro un contenitore trasformato in 3D: i
+  // tasselli non partivano mai. Li montiamo all'ingresso in viewport.
+  const { ref: mapRef, inView: mapInView } = useInView<HTMLDivElement>({ rootMargin: '200px' });
+
   return (
     <section className="py-20 md:py-28 bg-inchiostro">
       <div className="mx-auto max-w-[1600px] px-4 md:px-8">
-        <div className="text-center mb-12">
+        <div className="mb-10 md:mb-14">
           <span className="label text-sabbia">10 · Seguici</span>
           <h2 className="display-text text-carta text-4xl md:text-6xl mt-2">
             <em>{SOCIAL.instagramHandle}</em>
           </h2>
-          <p className="text-carta/50 text-sm mt-3">Nuovi arrivi, offerte e look dal negozio.</p>
+          <p className="text-carta/50 text-sm mt-3 max-w-md">
+            Nuovi arrivi, offerte e look dal negozio. Oppure passa a trovarci in {STORE.city}.
+          </p>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2 md:gap-4">
-          {galleryImages.map((img, i) => (
-            <motion.a
-              key={img.url}
-              href={SOCIAL.instagram}
-              target="_blank"
-              rel="noreferrer"
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.06, duration: 0.5 }}
-              className="relative aspect-square overflow-hidden group"
-              data-cursor="view"
-              aria-label={`${img.alt} — apri il profilo Instagram`}
+
+        <div className="grid gap-6 md:gap-8 lg:grid-cols-[auto_1fr]">
+          {/* Social — riga su mobile, colonna verticale da lg. Solo icona: il
+              nome del profilo vive nell'aria-label, non a schermo. */}
+          <ul className="flex lg:flex-col gap-3 lg:gap-4 lg:justify-center lg:pr-2">
+            {SOCIALS.map(({ name, href, label, Icon }, i) => (
+              <li key={name}>
+                <motion.a
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={label}
+                  data-cursor="link"
+                  initial={{ opacity: 0, y: 8 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.06, duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
+                  className="social-tile"
+                >
+                  <Icon size={22} />
+                </motion.a>
+              </li>
+            ))}
+          </ul>
+
+          <div>
+            <div
+              ref={mapRef}
+              className="relative overflow-hidden border border-carta/10 bg-inchiostro-400 aspect-[4/3] md:aspect-[16/9]"
+              style={{ perspective: '1100px' }}
             >
-              <img
-                src={img.url}
-                alt={img.alt}
-                loading="lazy"
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-              />
-              <div className="absolute inset-0 bg-inchiostro/0 group-hover:bg-inchiostro/40 transition-colors flex items-center justify-center">
-                <Instagram size={20} className="text-carta opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div
+                  className="map-plane relative"
+                  style={{
+                    width: TILE * 3,
+                    height: TILE * 3,
+                    transform: `rotateX(${MAP_TILT}deg) rotateZ(${parallax.x * 0.5}deg) scale(1.5)`,
+                  }}
+                >
+                  <div className="map-tiles absolute inset-0 grid grid-cols-3 grid-rows-3">
+                    {mapInView &&
+                      MAP_TILES.map(({ dx, dy }) => (
+                        <img
+                          key={`${dx}_${dy}`}
+                          src={`https://tile.openstreetmap.org/${MAP_ZOOM}/${mapTx + dx}/${mapTy + dy}.png`}
+                          alt=""
+                          aria-hidden="true"
+                          width={TILE}
+                          height={TILE}
+                          className="w-full h-full"
+                        />
+                      ))}
+                  </div>
+
+                  {/* Impronta a terra: resta sul piano, quindi eredita l'inclinazione. */}
+                  <span
+                    aria-hidden="true"
+                    className="absolute rounded-full border-2 border-rame/70 bg-rame/15"
+                    style={{
+                      left: PIN_LEFT,
+                      top: PIN_TOP,
+                      width: 56,
+                      height: 56,
+                      transform: 'translate(-50%, -50%)',
+                    }}
+                  />
+
+                  {/* Pin sollevato e contro-ruotato: sta in piedi sul piano inclinato. */}
+                  <a
+                    href={STORE_DIRECTIONS_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Apri le indicazioni stradali per ${STORE.name}, ${STORE_FULL_ADDRESS}`}
+                    data-cursor="link"
+                    className="map-pin absolute flex flex-col items-center"
+                    style={{
+                      left: PIN_LEFT,
+                      top: PIN_TOP,
+                      transformOrigin: 'center bottom',
+                      transform: `translate(-50%, -100%) translateZ(70px) rotateX(-${MAP_TILT}deg)`,
+                    }}
+                  >
+                    <span className="px-3 py-1.5 bg-sabbia text-inchiostro label text-[10px] whitespace-nowrap shadow-xl">
+                      {STORE.name} · Indicazioni
+                    </span>
+                    <span className="w-px h-6 bg-sabbia" />
+                  </a>
+                </div>
               </div>
-            </motion.a>
-          ))}
+
+              <a
+                href="https://www.openstreetmap.org/copyright"
+                target="_blank"
+                rel="noreferrer"
+                className="absolute bottom-1 right-2 text-[9px] text-carta/30 hover:text-carta/60 transition-colors"
+              >
+                © OpenStreetMap
+              </a>
+            </div>
+
+            <p className="text-carta/40 text-xs mt-3">
+              {STORE_FULL_ADDRESS} · {STORE.hours[0].time}
+            </p>
+          </div>
         </div>
       </div>
     </section>

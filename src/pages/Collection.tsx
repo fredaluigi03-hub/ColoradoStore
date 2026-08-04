@@ -7,6 +7,7 @@ import { editorialImages } from '@/lib/shop/editorial';
 import { usePageMeta } from '@/lib/meta';
 import type { Product, CollectionFilter } from '@/lib/shop/types';
 import ProductCard from '@/components/ProductCard';
+import { scrollToTop } from '@/lib/hooks';
 
 const SORT_OPTIONS = [
   { value: 'raccomandati', label: 'Raccomandati' },
@@ -358,7 +359,7 @@ export default function CollectionPage() {
           <div className="text-center mt-12">
             <button
               onClick={() => setVisibleCount((c) => c + 12)}
-              className="btn-3d-gold px-8 py-4 rounded-full bg-sabbia text-inchiostro label font-bold tracking-widest transition-all"
+              className="btn-3d btn-3d-gold px-8 py-4 rounded-full bg-sabbia text-inchiostro label font-bold tracking-widest transition-all"
             >
               CARICA ALTRI PRODOTTI
             </button>
@@ -374,11 +375,8 @@ export default function CollectionPage() {
             <span>🏠 TORNA ALLA HOME</span>
           </Link>
           <button
-            onClick={() => {
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-              if ((window as any).lenis) (window as any).lenis.scrollTo(0);
-            }}
-            className="btn-3d-gold px-6 py-3 rounded-full bg-sabbia text-inchiostro label text-xs font-bold tracking-widest flex items-center gap-2 shadow-xl"
+            onClick={scrollToTop}
+            className="btn-3d btn-3d-gold px-6 py-3 rounded-full bg-sabbia text-inchiostro label text-xs font-bold tracking-widest flex items-center gap-2 shadow-xl"
           >
             <span>⬆ TORNA IN CIMA</span>
           </button>

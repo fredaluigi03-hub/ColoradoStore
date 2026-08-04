@@ -32,6 +32,12 @@ export function useLenis() {
   }, []);
 }
 
+// Scroll fluido in cima alla pagina, sincronizzato con Lenis se attivo
+export function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if ((window as any).lenis) (window as any).lenis.scrollTo(0);
+}
+
 // Reveal all'ingresso in viewport con IntersectionObserver
 export function useInView<T extends HTMLElement = HTMLDivElement>(options?: IntersectionObserverInit) {
   const ref = useRef<T>(null);

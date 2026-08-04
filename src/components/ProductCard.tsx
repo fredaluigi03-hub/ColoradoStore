@@ -126,7 +126,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                     e.preventDefault();
                     addToCart(product, firstVariant);
                   }}
-                  className="btn-3d-gold w-full py-3 bg-sabbia text-inchiostro label font-bold shadow-lg"
+                  className="btn-3d btn-3d-gold w-full py-3 bg-sabbia text-inchiostro label font-bold shadow-lg"
                 >
                   Aggiungi al carrello
                 </button>

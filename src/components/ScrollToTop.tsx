@@ -9,8 +9,6 @@ export default function ScrollToTop() {
   useEffect(() => {
     // Forza lo scroll istantaneo in cima alla pagina ad ogni cambio rotta o categoria
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
 
     // Se Lenis è attivo, notifica lo scroll in cima
     if ((window as any).lenis) {
